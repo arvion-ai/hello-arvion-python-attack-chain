@@ -1,0 +1,39 @@
+# INTENTIONALLY MISCONFIGURED docker-compose for the Arvion IaC
+# scanner. Three concrete violations:
+#
+#   1. Postgres exposed on the host with the default password and
+#      bound to 0.0.0.0:5432 (lateral movement target).
+#   2. The API service mounts the entire repo as a volume so the
+#      committed .env is read live at runtime (no defence in depth
+#      between the file and the container).
+#   3. No `read_only` flag, no cap_drop, no security_opt no-new-
+#      privileges — RCE in the API container hits root with full
+#      capabilities.
+#
+# The aggregate IaC posture is what makes the chain "Public
+# Internet -> data_loss" defensible to the composer's confidence
+# floor: the LLM can ground each step on a concrete misconfig
+# rather than guessing.
+
+services:
+  api:
+    build: ..
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ..:/app
+    environment:
+      - DATABASE_URL=postgresql://api_user:hunter2-demo-only@db:5432/customer_orders
+    depends_on:
+      - db
+    # No read_only, no cap_drop, no security_opt.
+
+  db:
+    image: postgres:14
+    ports:
+      - "0.0.0.0:5432:5432"
+    environment:
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD: hunter2-demo-only
+      POSTGRES_DB: customer_orders
+    # No tmpfs for /var/lib/postgresql/data, no SSL, world-bound port.

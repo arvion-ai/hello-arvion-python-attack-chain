@@ -1,0 +1,10 @@
+<!doctype html>
+<html>
+<head><title>Profile · {{ user_id }}</title></head>
+<body>
+  <h1>Hello, {{ user_id }}</h1>
+  <p>This is a benign template. The handler in <code>app/main.py</code>
+  lets the caller pick which template to render, which is what makes
+  the SSTI chain step reachable.</p>
+</body>
+</html>

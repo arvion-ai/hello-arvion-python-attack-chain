@@ -1,0 +1,42 @@
+name: chain-poc
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Two jobs: one proves the baseline is exploitable (exit 1), the
+# other runs only on Arvion fix PRs and proves the chain is closed
+# (exit 0). Same payload, opposite expected exit code.
+jobs:
+  baseline-vulnerable:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+      - run: sleep 3
+      - name: Chain must reproduce
+        run: |
+          python exploit/chain.py http://127.0.0.1:8000 && {
+            echo "Unexpected: chain refused on the vulnerable baseline."
+            exit 1
+          } || echo "Expected: chain reproduces. CI green."
+
+  fix-pr-closes-chain:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+      - run: sleep 3
+      - name: Chain must be broken at least one step
+        run: |
+          python exploit/chain.py http://127.0.0.1:8000
